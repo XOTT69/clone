@@ -2,295 +2,223 @@
 <html lang="uk">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Lampa Ultimate - Advanced Plugin Support</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lampa Pro - Real Stream</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <style>
-        body { background-color: #020617; color: #f8fafc; margin: 0; user-select: none; font-family: 'Inter', system-ui, sans-serif; overflow: hidden; }
-        .glass { background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.05); }
-        .focus-ring { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); border: 2px solid transparent; }
-        .focus-ring:focus { outline: none; border-color: #3b82f6; transform: scale(1.02); background: rgba(59, 130, 246, 0.1); }
-        .active-glow { box-shadow: 0 0 25px rgba(59, 130, 246, 0.5); }
-        
-        @keyframes shimmer { 0% { opacity: 0.3; } 50% { opacity: 1; } 100% { opacity: 0.3; } }
-        .shimmer { animation: shimmer 2s infinite; }
-        
-        @keyframes slideUp { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-        .animate-slide-up { animation: slideUp 0.4s ease-out forwards; }
-        
-        .custom-range { -webkit-appearance: none; height: 4px; border-radius: 2px; background: rgba(255,255,255,0.1); }
-        .custom-range::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; background: #3b82f6; border-radius: 50%; cursor: pointer; border: 3px solid white; box-shadow: 0 0 10px rgba(0,0,0,0.5); }
+        body { background-color: #050a15; color: #f8fafc; margin: 0; font-family: 'Inter', sans-serif; overflow: hidden; }
+        .player-container { background: #000; position: relative; width: 100vw; height: 100vh; overflow: hidden; }
+        video { width: 100%; height: 100%; object-fit: contain; background: #000; }
+        .controls-overlay {
+            background: linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.4) 50%, rgba(0,0,0,0.1) 100%);
+            transition: opacity 0.3s ease;
+        }
+        .hide-cursor { cursor: none; }
+        .movie-card:hover { transform: scale(1.05); border-color: #3b82f6; }
+        .loader {
+            border: 4px solid rgba(255, 255, 255, 0.1);
+            border-left-color: #3b82f6;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect, useCallback, useMemo } = React;
+        const { useState, useEffect, useRef } = React;
 
-        const Lucide = ({ name, className = "w-6 h-6" }) => {
+        const Icon = ({ name, className = "w-6 h-6" }) => {
             const icons = {
-                play: <path d="m5 3 14 9-14 9V3z"/>,
-                pause: <><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></>,
-                back: <path d="m15 18-6-6 6-6"/>,
-                settings: <><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></>,
-                layers: <><path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m2.2 12.91 8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83l-8.58 3.9a2 2 0 0 1-1.66 0L2.2 11.08a1 1 0 0 0 0 1.83Z"/></>,
-                volume: <><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></>,
-                check: <path d="M20 6 9 17l-5-5"/>
+                play: <path d="m5 3 14 9-14 9V3z" fill="currentColor"/>,
+                pause: <><rect x="6" y="4" width="4" height="16" fill="currentColor"/><rect x="14" y="4" width="4" height="16" fill="currentColor"/></>,
+                back: <path d="m15 18-6-6 6-6" />,
+                settings: (
+                    <>
+                        <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/>
+                        <circle cx="12" cy="12" r="3"/>
+                    </>
+                ),
+                maximize: <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3" />
             };
             return (
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={className}>
-                    {icons[name] || null}
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+                    {icons[name]}
                 </svg>
             );
         };
 
-        const MOCK_SOURCES = [
-            { id: 'uafilm', name: 'UAFilm (Озвучка)', translations: ['Дубляж (Офіційний)', 'UAFilm Team', 'Цікава Ідея'], qualities: ['1080p', '4K'] },
-            { id: 'hdrezka', name: 'HDRezka (Мод)', translations: ['Оригінал + Субтитри', 'HDRezka Studio'], qualities: ['720p', '1080p'] },
-            { id: 'uaserial', name: 'UA Serial', translations: ['UA Team', 'BaibaKo'], qualities: ['1080p'] }
+        const MOVIES = [
+            { 
+                id: 1, 
+                title: "Big Buck Bunny (Тест)", 
+                url: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
+                img: "https://upload.wikimedia.org/wikipedia/commons/c/c5/Big_buck_bunny_poster_big.jpg"
+            },
+            { 
+                id: 2, 
+                title: "Космічні Слізи", 
+                url: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4",
+                img: "https://upload.wikimedia.org/wikipedia/commons/6/69/Tears_of_Steel_poster.jpg"
+            }
         ];
 
         function App() {
-            const [view, setView] = useState('browser'); // browser, selector, loading, player
-            const [movies, setMovies] = useState([]);
-            const [selectedMovie, setSelectedMovie] = useState(null);
-            const [selectedSource, setSelectedSource] = useState(null);
-            const [selectedTranslation, setSelectedTranslation] = useState('');
-            const [selectedQuality, setSelectedQuality] = useState('');
-            const [isPlaying, setIsPlaying] = useState(true);
-            const [progress, setProgress] = useState(15);
+            const [view, setView] = useState('catalog');
+            const [currentMovie, setCurrentMovie] = useState(null);
+            const [isPlaying, setIsPlaying] = useState(false);
+            const [progress, setProgress] = useState(0);
+            const [duration, setDuration] = useState(0);
+            const [isLoading, setIsLoading] = useState(false);
+            const [showControls, setShowControls] = useState(true);
+            const [error, setError] = useState(null);
 
-            useEffect(() => {
-                fetch(`https://api.themoviedb.org/3/trending/movie/week?api_key=c3d325262a386fc19e9cb286c843c829&language=uk-UA`)
-                    .then(r => r.json())
-                    .then(data => setMovies(data.results));
-            }, []);
+            const videoRef = useRef(null);
+            const timerRef = useRef(null);
 
-            const openSelector = (movie) => {
-                setSelectedMovie(movie);
-                setView('selector');
+            const handlePlay = (movie) => {
+                setCurrentMovie(movie);
+                setView('player');
+                setIsLoading(true);
+                setError(null);
             };
 
-            const startPlayback = () => {
-                setView('loading');
-                setTimeout(() => setView('player'), 2000);
+            const togglePlay = () => {
+                if (videoRef.current.paused) {
+                    videoRef.current.play();
+                    setIsPlaying(true);
+                } else {
+                    videoRef.current.pause();
+                    setIsPlaying(false);
+                }
             };
+
+            const handleTimeUpdate = () => {
+                if (videoRef.current) {
+                    const p = (videoRef.current.currentTime / videoRef.current.duration) * 100;
+                    setProgress(p || 0);
+                }
+            };
+
+            const handleMouseMove = () => {
+                setShowControls(true);
+                clearTimeout(timerRef.current);
+                timerRef.current = setTimeout(() => {
+                    if (isPlaying) setShowControls(false);
+                }, 3000);
+            };
+
+            const formatTime = (time) => {
+                const min = Math.floor(time / 60);
+                const sec = Math.floor(time % 60);
+                return `${min}:${sec < 10 ? '0' : ''}${sec}`;
+            };
+
+            if (view === 'catalog') {
+                return (
+                    <div className="p-10 max-w-6xl mx-auto">
+                        <h1 className="text-4xl font-black mb-10 text-blue-500 italic">LAMPA <span className="text-white">REAL</span></h1>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
+                            {MOVIES.map(movie => (
+                                <div key={movie.id} onClick={() => handlePlay(movie)} className="movie-card bg-slate-900 rounded-2xl p-2 cursor-pointer border border-white/5 transition-all">
+                                    <img src={movie.img} className="w-full aspect-[2/3] object-cover rounded-xl mb-3" />
+                                    <h3 className="font-bold text-center pb-2">{movie.title}</h3>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                );
+            }
 
             return (
-                <div className="h-screen w-screen relative bg-slate-950">
-                    {/* Main Browser */}
-                    {view === 'browser' && (
-                        <div className="h-full flex flex-col p-10 overflow-y-auto custom-scrollbar">
-                            <h1 className="text-4xl font-black mb-10 tracking-tight italic">LAMPA <span className="text-blue-500">PRO</span></h1>
-                            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-6">
-                                {movies.map(m => (
-                                    <button 
-                                        key={m.id} 
-                                        onClick={() => openSelector(m)}
-                                        className="focus-ring bg-slate-900 rounded-2xl overflow-hidden text-left shadow-2xl group"
-                                    >
-                                        <div className="aspect-[2/3] relative">
-                                            <img src={`https://image.tmdb.org/t/p/w500${m.poster_path}`} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
-                                            <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent"></div>
-                                        </div>
-                                        <div className="p-4 font-bold truncate text-sm">{m.title}</div>
-                                    </button>
-                                ))}
+                <div 
+                    className={`player-container ${!showControls && isPlaying ? 'hide-cursor' : ''}`}
+                    onMouseMove={handleMouseMove}
+                >
+                    <video 
+                        ref={videoRef}
+                        src={currentMovie.url}
+                        onTimeUpdate={handleTimeUpdate}
+                        onLoadedMetadata={() => {
+                            setDuration(videoRef.current.duration);
+                            setIsLoading(false);
+                            videoRef.current.play();
+                            setIsPlaying(true);
+                        }}
+                        onWaiting={() => setIsLoading(true)}
+                        onPlaying={() => setIsLoading(false)}
+                        onError={() => setError("Помилка завантаження відеопотоку. Перевірте посилання або плагін.")}
+                        onClick={togglePlay}
+                    />
+
+                    {error && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/90 z-50 text-center p-6">
+                            <div>
+                                <div className="text-red-500 text-5xl mb-4">⚠️</div>
+                                <h2 className="text-xl font-bold mb-4">{error}</h2>
+                                <button onClick={() => setView('catalog')} className="bg-blue-600 px-6 py-2 rounded-full">Назад до каталогу</button>
                             </div>
                         </div>
                     )}
 
-                    {/* Source & Translation Selector */}
-                    {view === 'selector' && (
-                        <div className="absolute inset-0 z-50 glass flex items-center justify-center p-6">
-                            <div className="w-full max-w-4xl bg-slate-900 rounded-[3rem] overflow-hidden shadow-2xl flex border border-white/10 animate-slide-up">
-                                <div className="w-1/3 border-r border-white/5 bg-black/20 p-8">
-                                    <img src={`https://image.tmdb.org/t/p/w500${selectedMovie.poster_path}`} className="rounded-2xl shadow-xl mb-6" />
-                                    <h2 className="font-black text-xl leading-tight mb-2">{selectedMovie.title}</h2>
-                                    <div className="text-blue-400 font-bold text-xs uppercase tracking-widest">UA Online Extension</div>
-                                </div>
-                                
-                                <div className="flex-1 p-10 overflow-y-auto max-h-[80vh] custom-scrollbar">
-                                    <div className="flex justify-between items-center mb-8">
-                                        <h3 className="text-2xl font-black tracking-tighter uppercase">Джерела та озвучка</h3>
-                                        <button onClick={() => setView('browser')} className="p-2 bg-white/5 rounded-full"><Lucide name="back" className="rotate-180" /></button>
-                                    </div>
-
-                                    <div className="space-y-6">
-                                        {MOCK_SOURCES.map(source => (
-                                            <div key={source.id} className={`p-6 rounded-3xl border transition-all ${selectedSource?.id === source.id ? 'bg-blue-600/10 border-blue-500' : 'bg-white/5 border-transparent'}`}>
-                                                <button 
-                                                    onClick={() => {setSelectedSource(source); setSelectedTranslation('');}}
-                                                    className="w-full flex justify-between items-center mb-4"
-                                                >
-                                                    <div className="flex items-center gap-4">
-                                                        <div className={`w-4 h-4 rounded-full border-4 ${selectedSource?.id === source.id ? 'border-blue-500 bg-white' : 'border-white/20'}`}></div>
-                                                        <span className="font-black text-lg uppercase">{source.name}</span>
-                                                    </div>
-                                                    <span className="text-[10px] bg-white/10 px-2 py-1 rounded text-slate-400 font-black">CDN ACTIVE</span>
-                                                </button>
-
-                                                {selectedSource?.id === source.id && (
-                                                    <div className="pl-8 space-y-4 animate-fadeIn">
-                                                        <div className="grid grid-cols-1 gap-2">
-                                                            {source.translations.map(t => (
-                                                                <button 
-                                                                    key={t}
-                                                                    onClick={() => setSelectedTranslation(t)}
-                                                                    className={`p-4 rounded-xl text-left text-sm font-bold flex justify-between items-center ${selectedTranslation === t ? 'bg-blue-600 text-white' : 'bg-white/5 hover:bg-white/10'}`}
-                                                                >
-                                                                    {t}
-                                                                    {selectedTranslation === t && <Lucide name="check" className="w-4 h-4" />}
-                                                                </button>
-                                                            ))}
-                                                        </div>
-                                                        <div className="flex gap-2">
-                                                            {source.qualities.map(q => (
-                                                                <button 
-                                                                    key={q}
-                                                                    onClick={() => setSelectedQuality(q)}
-                                                                    className={`px-4 py-2 rounded-lg text-xs font-black border ${selectedQuality === q ? 'bg-white text-black border-white' : 'border-white/20 text-slate-500 hover:text-white'}`}
-                                                                >
-                                                                    {q}
-                                                                </button>
-                                                            ))}
-                                                        </div>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        ))}
-                                    </div>
-
-                                    {selectedTranslation && selectedQuality && (
-                                        <button 
-                                            onClick={startPlayback}
-                                            className="w-full mt-10 bg-blue-600 hover:bg-blue-500 py-6 rounded-2xl font-black uppercase tracking-widest text-lg shadow-xl shadow-blue-600/30 active:scale-95 transition-all"
-                                        >
-                                            Запустити потік
-                                        </button>
-                                    )}
-                                </div>
-                            </div>
+                    {isLoading && !error && (
+                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                            <div className="loader"></div>
                         </div>
                     )}
 
-                    {/* Advanced Loading State */}
-                    {view === 'loading' && (
-                        <div className="absolute inset-0 z-[100] bg-black flex items-center justify-center">
-                            <div className="text-center">
-                                <div className="relative w-48 h-48 mb-10 mx-auto">
-                                    <div className="absolute inset-0 border-[8px] border-blue-600/10 rounded-full"></div>
-                                    <div className="absolute inset-0 border-[8px] border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                                    <div className="absolute inset-0 flex items-center justify-center">
-                                        <div className="text-blue-500 font-black text-2xl uppercase tracking-widest animate-pulse">Wait</div>
-                                    </div>
-                                </div>
-                                <h2 className="text-4xl font-black tracking-tighter uppercase mb-4">Налаштування джерела</h2>
-                                <p className="text-slate-500 font-bold uppercase text-xs tracking-[0.3em]">З’єднання: {selectedTranslation} • {selectedQuality}</p>
-                                <div className="mt-8 flex gap-2 justify-center">
-                                    {[1,2,3].map(i => <div key={i} className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style={{animationDelay: `${i*0.2}s`}}></div>)}
-                                </div>
+                    <div className={`absolute inset-0 controls-overlay flex flex-col justify-between p-8 transition-opacity duration-500 ${showControls || !isPlaying ? 'opacity-100' : 'opacity-0'}`}>
+                        <div className="flex justify-between items-start">
+                            <button onClick={() => setView('catalog')} className="p-4 bg-white/10 rounded-2xl hover:bg-white/20 transition-all">
+                                <Icon name="back" />
+                            </button>
+                            <div className="text-right">
+                                <h2 className="text-2xl font-black uppercase tracking-tighter">{currentMovie.title}</h2>
+                                <p className="text-blue-400 text-xs font-bold">LIVE STREAMING</p>
                             </div>
                         </div>
-                    )}
 
-                    {/* Final Working Player */}
-                    {view === 'player' && (
-                        <div className="absolute inset-0 z-[200] bg-black flex flex-col">
-                            {/* Overlay Top */}
-                            <div className="absolute top-0 inset-x-0 p-12 flex justify-between items-start bg-gradient-to-b from-black/80 via-black/40 to-transparent z-10">
-                                <div className="flex gap-8 items-center">
-                                    <button onClick={() => setView('selector')} className="p-5 bg-white/10 hover:bg-blue-600 rounded-3xl transition-all shadow-2xl group">
-                                        <Lucide name="back" className="w-8 h-8 group-hover:-translate-x-1 transition-transform" />
-                                    </button>
-                                    <div>
-                                        <h2 className="text-4xl font-black uppercase tracking-tighter">{selectedMovie.title}</h2>
-                                        <div className="flex gap-3 mt-2 items-center">
-                                            <span className="bg-blue-600 px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest">{selectedSource.name}</span>
-                                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{selectedTranslation}</span>
-                                            <span className="w-1.5 h-1.5 bg-green-500 rounded-full active-glow"></span>
-                                            <span className="text-[10px] font-bold text-green-500 uppercase tracking-widest">Live Stream Active</span>
-                                        </div>
-                                    </div>
-                                </div>
-                                <button className="p-5 bg-white/10 rounded-3xl"><Lucide name="settings" /></button>
+                        <div className="max-w-4xl mx-auto w-full">
+                            <div className="flex justify-between text-xs font-bold mb-2 text-slate-400">
+                                <span>{videoRef.current ? formatTime(videoRef.current.currentTime) : '0:00'}</span>
+                                <span>{formatTime(duration)}</span>
+                            </div>
+                            
+                            <div className="relative h-1.5 bg-white/20 rounded-full mb-8 cursor-pointer group">
+                                <div 
+                                    className="absolute inset-y-0 left-0 bg-blue-600 rounded-full shadow-[0_0_15px_rgba(59,130,246,0.8)]"
+                                    style={{ width: `${progress}%` }}
+                                ></div>
+                                <input 
+                                    type="range" min="0" max="100" step="0.1" value={progress}
+                                    onChange={(e) => {
+                                        const newTime = (e.target.value / 100) * duration;
+                                        videoRef.current.currentTime = newTime;
+                                        setProgress(e.target.value);
+                                    }}
+                                    className="absolute inset-0 w-full opacity-0 cursor-pointer z-10"
+                                />
                             </div>
 
-                            {/* Center Content */}
-                            <div className="flex-1 flex items-center justify-center relative group">
-                                <div className="absolute inset-0 bg-slate-900 overflow-hidden">
-                                    {/* Mock Video Texture */}
-                                    <div className="w-full h-full bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-20"></div>
-                                    <div className="absolute inset-0 flex items-center justify-center">
-                                        <div className="text-white/5 font-black text-[20vw] select-none uppercase italic tracking-tighter">PLAYING</div>
-                                    </div>
-                                </div>
-                                
+                            <div className="flex items-center justify-center gap-12">
+                                <button onClick={() => videoRef.current.currentTime -= 10} className="hover:text-blue-400 transition-colors"><Icon name="back" className="w-8 h-8 rotate-0"/></button>
                                 <button 
-                                    onClick={() => setIsPlaying(!isPlaying)}
-                                    className="z-20 w-32 h-32 bg-white/10 hover:bg-blue-600 text-white rounded-full flex items-center justify-center backdrop-blur-md opacity-0 group-hover:opacity-100 transition-all scale-75 group-hover:scale-100 shadow-2xl"
+                                    onClick={togglePlay}
+                                    className="w-20 h-20 bg-white text-black rounded-full flex items-center justify-center hover:scale-110 transition-all"
                                 >
-                                    <Lucide name={isPlaying ? "pause" : "play"} className="w-12 h-12 fill-current" />
+                                    <Icon name={isPlaying ? "pause" : "play"} className="w-10 h-10 ml-1" />
                                 </button>
-                            </div>
-
-                            {/* Controls Bottom */}
-                            <div className="absolute bottom-0 inset-x-0 p-12 bg-gradient-to-t from-black via-black/80 to-transparent">
-                                <div className="max-w-7xl mx-auto">
-                                    <div className="flex justify-between text-xs font-black uppercase tracking-widest text-slate-500 mb-4 px-2">
-                                        <span className="text-blue-400">00:42:15</span>
-                                        <div className="flex gap-4">
-                                            <span className="shimmer">Buffer: 98%</span>
-                                            <span className="text-white">{selectedQuality}</span>
-                                        </div>
-                                        <span>02:14:00</span>
-                                    </div>
-
-                                    <div className="relative h-2 bg-white/10 rounded-full mb-10 overflow-hidden">
-                                        <div 
-                                            className="absolute inset-y-0 left-0 bg-blue-600 active-glow transition-all duration-300" 
-                                            style={{width: `${progress}%`}}
-                                        ></div>
-                                        <input 
-                                            type="range" 
-                                            value={progress} 
-                                            onChange={(e) => setProgress(e.target.value)}
-                                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                                        />
-                                    </div>
-
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-12">
-                                            <button className="text-slate-400 hover:text-white transition-colors"><Lucide name="volume" /></button>
-                                            <div className="w-32 h-1 bg-white/10 rounded-full overflow-hidden">
-                                                <div className="w-3/4 h-full bg-white"></div>
-                                            </div>
-                                        </div>
-
-                                        <div className="flex items-center gap-16 absolute left-1/2 -translate-x-1/2">
-                                            <button className="text-slate-500 hover:text-white transition-all scale-125"><Lucide name="back" /></button>
-                                            <button 
-                                                onClick={() => setIsPlaying(!isPlaying)}
-                                                className="w-24 h-24 bg-white text-black rounded-full flex items-center justify-center hover:scale-110 active:scale-95 transition-all shadow-[0_0_40px_rgba(255,255,255,0.2)]"
-                                            >
-                                                <Lucide name={isPlaying ? "pause" : "play"} className="w-10 h-10 fill-current ml-1" />
-                                            </button>
-                                            <button className="text-slate-500 hover:text-white transition-all scale-125 rotate-180"><Lucide name="back" /></button>
-                                        </div>
-
-                                        <div className="flex items-center gap-8">
-                                            <button className="p-3 bg-white/5 rounded-xl text-xs font-black uppercase tracking-tighter hover:bg-white/10">Субтитри</button>
-                                            <button className="p-3 bg-white/5 rounded-xl text-xs font-black uppercase tracking-tighter hover:bg-white/10">Серії</button>
-                                        </div>
-                                    </div>
-                                </div>
+                                <button onClick={() => videoRef.current.currentTime += 10} className="hover:text-blue-400 transition-colors"><Icon name="back" className="w-8 h-8 rotate-180"/></button>
                             </div>
                         </div>
-                    )}
+                    </div>
                 </div>
             );
         }
