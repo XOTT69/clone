@@ -3,113 +3,156 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Lampa Pro - Real Stream</title>
+    <title>Lampa Pro - Ultimate Edition</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
-        body { background-color: #050a15; color: #f8fafc; margin: 0; font-family: 'Inter', sans-serif; overflow: hidden; }
-        .player-container { background: #000; position: relative; width: 100vw; height: 100vh; overflow: hidden; }
-        video { width: 100%; height: 100%; object-fit: contain; background: #000; }
-        .controls-overlay {
-            background: linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.4) 50%, rgba(0,0,0,0.1) 100%);
-            transition: opacity 0.3s ease;
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
+        
+        body { 
+            background-color: #080d17; 
+            color: #f8fafc; 
+            margin: 0; 
+            font-family: 'Inter', sans-serif; 
+            overflow: hidden; 
         }
-        .hide-cursor { cursor: none; }
-        .movie-card:hover { transform: scale(1.05); border-color: #3b82f6; }
+
+        /* Ефекти карток */
+        .movie-card {
+            transition: all 0.4s cubic-bezier(0.165, 0.84, 0.44, 1);
+            border: 2px solid transparent;
+        }
+        .movie-card:hover {
+            transform: scale(1.05) translateY(-5px);
+            border-color: #3b82f6;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(59, 130, 246, 0.2);
+        }
+
+        /* Плеєр та анімації */
+        .player-container { background: #000; position: fixed; inset: 0; z-index: 100; }
+        video { width: 100%; height: 100%; object-fit: contain; }
+        
         .loader {
-            border: 4px solid rgba(255, 255, 255, 0.1);
+            border: 3px solid rgba(255, 255, 255, 0.1);
             border-left-color: #3b82f6;
             border-radius: 50%;
-            width: 50px;
-            height: 50px;
-            animation: spin 1s linear infinite;
+            width: 40px;
+            height: 40px;
+            animation: spin 0.8s linear infinite;
         }
         @keyframes spin { to { transform: rotate(360deg); } }
-        
-        /* Sidebar styles */
-        .sidebar-item { transition: all 0.3s ease; }
-        .sidebar-item:hover { background: rgba(255,255,255,0.05); color: #fff; }
-        .active-tab { color: #3b82f6; background: rgba(59, 130, 246, 0.1); border-right: 3px solid #3b82f6; }
+
+        /* Кастомний скроллбар */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #334155; }
+
+        .rating-badge {
+            background: rgba(0,0,0,0.7);
+            backdrop-filter: blur(4px);
+            padding: 2px 8px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 800;
+            color: #fbbf24;
+            border: 1px solid rgba(251, 191, 36, 0.3);
+        }
     </style>
 </head>
 <body>
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect, useRef } = React;
+        const { useState, useEffect, useRef, useMemo } = React;
 
-        const Icon = ({ name, className = "w-6 h-6" }) => {
+        // --- ДАНІ ТА КОНФІГ ---
+        const MOVIES_DATA = [
+            { 
+                id: 1, 
+                title: "Дюна: Частина друга", 
+                orig: "Dune: Part Two",
+                year: 2024,
+                rating: 8.8,
+                desc: "Пол Атрід об'єднується з Чані та фрименами, щоб помститися змовникам, які знищили його родину.",
+                url: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
+                img: "https://images.unsplash.com/photo-1541963463532-d68292c34b19?auto=format&fit=crop&q=80&w=600",
+                genres: ["Фантастика", "Бойовик"]
+            },
+            { 
+                id: 2, 
+                title: "Оппенгеймер", 
+                orig: "Oppenheimer",
+                year: 2023,
+                rating: 8.6,
+                desc: "Історія життя фізика Роберта Оппенгеймера, який очолив розробку атомної бомби.",
+                url: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4",
+                img: "https://images.unsplash.com/photo-1440404653325-ab127d49abc1?auto=format&fit=crop&q=80&w=600",
+                genres: ["Драма", "Біографія"]
+            },
+            { 
+                id: 3, 
+                title: "Фолаут", 
+                orig: "Fallout",
+                year: 2024,
+                rating: 8.5,
+                desc: "У майбутньому після ядерної війни, мешканці бункерів виходять на поверхню дикого світу.",
+                url: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4",
+                img: "https://images.unsplash.com/photo-1534237710431-e2fc698436d0?auto=format&fit=crop&q=80&w=600",
+                genres: ["Фантастика", "Пригоди"]
+            },
+            { 
+                id: 4, 
+                title: "Шьоґун", 
+                orig: "Shōgun",
+                year: 2024,
+                rating: 9.1,
+                desc: "Боротьба за владу у феодальній Японії 1600-х років через очі англійського штурмана.",
+                url: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4",
+                img: "https://images.unsplash.com/photo-1528360983277-13d9b152c6d7?auto=format&fit=crop&q=80&w=600",
+                genres: ["Драма", "Історія"]
+            }
+        ];
+
+        const Icon = ({ name, size = 24, className = "" }) => {
             const icons = {
                 home: <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />,
                 movies: <rect width="18" height="18" x="3" y="3" rx="2" ry="2" />,
                 series: <path d="M2 8h20M2 12h20M2 16h20" />,
-                ai: <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />,
                 play: <path d="m5 3 14 9-14 9V3z" fill="currentColor"/>,
                 pause: <><rect x="6" y="4" width="4" height="16" fill="currentColor"/><rect x="14" y="4" width="4" height="16" fill="currentColor"/></>,
                 back: <path d="m15 18-6-6 6-6" />,
-                settings: (
-                    <>
-                        <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/>
-                        <circle cx="12" cy="12" r="3"/>
-                    </>
-                ),
+                settings: <circle cx="12" cy="12" r="3" />,
+                close: <path d="M18 6 6 18M6 6l12 12" />
             };
             return (
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{width: size, height: size}} className={className}>
                     {icons[name] || <circle cx="12" cy="12" r="10" />}
                 </svg>
             );
         };
 
-        const MOVIES = [
-            { 
-                id: 1, 
-                title: "Big Buck Bunny (Тест)", 
-                url: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
-                img: "https://upload.wikimedia.org/wikipedia/commons/c/c5/Big_buck_bunny_poster_big.jpg"
-            },
-            { 
-                id: 2, 
-                title: "Космічні Слізи", 
-                url: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4",
-                img: "https://upload.wikimedia.org/wikipedia/commons/6/69/Tears_of_Steel_poster.jpg"
-            },
-            { 
-                id: 3, 
-                title: "Sintel (Анімація)", 
-                url: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4",
-                img: "https://upload.wikimedia.org/wikipedia/commons/d/df/Sintel_poster.jpg"
-            },
-            { 
-                id: 4, 
-                title: "Елефант Дрім", 
-                url: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4",
-                img: "https://upload.wikimedia.org/wikipedia/commons/e/e8/Elephants_Dream_poster.jpg"
-            }
-        ];
-
+        // --- ГОЛОВНИЙ ДОДАТОК ---
         function App() {
             const [view, setView] = useState('catalog'); // catalog, player, settings
             const [activeTab, setActiveTab] = useState('home');
-            const [currentMovie, setCurrentMovie] = useState(null);
+            const [selectedMovie, setSelectedMovie] = useState(null);
             const [isPlaying, setIsPlaying] = useState(false);
-            const [progress, setProgress] = useState(0);
+            const [videoProgress, setVideoProgress] = useState(0);
             const [duration, setDuration] = useState(0);
             const [isLoading, setIsLoading] = useState(false);
             const [showControls, setShowControls] = useState(true);
-            const [error, setError] = useState(null);
 
             const videoRef = useRef(null);
             const timerRef = useRef(null);
 
-            const handlePlay = (movie) => {
-                setCurrentMovie(movie);
+            // Логіка керування плеєром
+            const startPlayback = (movie) => {
+                setSelectedMovie(movie);
                 setView('player');
                 setIsLoading(true);
-                setError(null);
             };
 
             const togglePlay = () => {
@@ -122,13 +165,6 @@
                 }
             };
 
-            const handleTimeUpdate = () => {
-                if (videoRef.current) {
-                    const p = (videoRef.current.currentTime / videoRef.current.duration) * 100;
-                    setProgress(p || 0);
-                }
-            };
-
             const handleMouseMove = () => {
                 setShowControls(true);
                 clearTimeout(timerRef.current);
@@ -137,118 +173,85 @@
                 }, 3000);
             };
 
-            const formatTime = (time) => {
-                const min = Math.floor(time / 60);
-                const sec = Math.floor(time % 60);
-                return `${min}:${sec < 10 ? '0' : ''}${sec}`;
-            };
-
-            // Компонент меню
+            // Компоненти інтерфейсу
             const Sidebar = () => (
-                <div className="fixed left-0 top-0 h-full w-20 md:w-24 bg-slate-900/50 backdrop-blur-xl border-r border-white/5 flex flex-col items-center py-8 z-40">
-                    <div className="mb-12">
-                        <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center shadow-lg cursor-pointer" onClick={() => setView('catalog')}>
-                            <Icon name="play" className="w-5 h-5 text-white" />
+                <div className="fixed left-0 top-0 h-full w-20 bg-slate-900/40 backdrop-blur-2xl border-r border-white/5 flex flex-col items-center py-10 z-50">
+                    <div className="mb-14">
+                        <div className="w-11 h-11 bg-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/20">
+                            <Icon name="play" size={20} className="text-white ml-0.5" />
                         </div>
                     </div>
-                    
-                    <div className="flex flex-col gap-8">
+                    <div className="flex flex-col gap-9">
                         {[
                             { id: 'home', icon: 'home' },
                             { id: 'movies', icon: 'movies' },
                             { id: 'series', icon: 'series' },
-                            { id: 'ai', icon: 'ai' },
                             { id: 'settings', icon: 'settings' }
-                        ].map((item) => (
-                            <button
+                        ].map(item => (
+                            <button 
                                 key={item.id}
-                                onClick={() => {
-                                    setActiveTab(item.id);
-                                    if (item.id === 'settings') setView('settings');
-                                    else setView('catalog');
-                                }}
-                                className={`p-3 rounded-xl sidebar-item ${activeTab === item.id ? 'active-tab' : 'text-slate-400'}`}
+                                onClick={() => { setActiveTab(item.id); setView(item.id === 'settings' ? 'settings' : 'catalog'); }}
+                                className={`p-3 rounded-2xl transition-all ${activeTab === item.id ? 'bg-blue-600/10 text-blue-500' : 'text-slate-500 hover:text-white'}`}
                             >
-                                <Icon name={item.icon} className="w-7 h-7" />
+                                <Icon name={item.icon} size={28} />
                             </button>
                         ))}
                     </div>
                 </div>
             );
 
-            if (view === 'player') {
+            // Рендер плеєра
+            if (view === 'player' && selectedMovie) {
                 return (
-                    <div 
-                        className={`player-container ${!showControls && isPlaying ? 'hide-cursor' : ''}`}
-                        onMouseMove={handleMouseMove}
-                    >
+                    <div className="player-container" onMouseMove={handleMouseMove}>
                         <video 
                             ref={videoRef}
-                            src={currentMovie.url}
-                            onTimeUpdate={handleTimeUpdate}
-                            onLoadedMetadata={() => {
-                                setDuration(videoRef.current.duration);
-                                setIsLoading(false);
-                                videoRef.current.play();
-                                setIsPlaying(true);
-                            }}
-                            onWaiting={() => setIsLoading(true)}
-                            onPlaying={() => setIsLoading(false)}
-                            onError={() => setError("Помилка завантаження відеопотоку.")}
+                            src={selectedMovie.url}
+                            onTimeUpdate={() => setVideoProgress((videoRef.current.currentTime / videoRef.current.duration) * 100)}
+                            onLoadedMetadata={() => { setDuration(videoRef.current.duration); setIsLoading(false); videoRef.current.play(); setIsPlaying(true); }}
                             onClick={togglePlay}
                         />
 
-                        {error && (
-                            <div className="absolute inset-0 flex items-center justify-center bg-black/90 z-50 text-center p-6">
-                                <div>
-                                    <h2 className="text-xl font-bold mb-4">{error}</h2>
-                                    <button onClick={() => setView('catalog')} className="bg-blue-600 px-6 py-2 rounded-full font-bold">Назад</button>
-                                </div>
-                            </div>
-                        )}
-
-                        {isLoading && !error && (
-                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                        {isLoading && (
+                            <div className="absolute inset-0 flex items-center justify-center">
                                 <div className="loader"></div>
                             </div>
                         )}
 
-                        <div className={`absolute inset-0 controls-overlay flex flex-col justify-between p-8 transition-opacity duration-500 ${showControls || !isPlaying ? 'opacity-100' : 'opacity-0'}`}>
+                        <div className={`absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-black/60 p-10 flex flex-col justify-between transition-opacity duration-500 ${showControls || !isPlaying ? 'opacity-100' : 'opacity-0'}`}>
                             <div className="flex justify-between items-start">
-                                <button onClick={() => setView('catalog')} className="p-4 bg-white/10 rounded-2xl hover:bg-white/20 transition-all">
+                                <button onClick={() => setView('catalog')} className="p-4 bg-white/5 rounded-2xl hover:bg-white/10 text-white backdrop-blur-md border border-white/10">
                                     <Icon name="back" />
                                 </button>
                                 <div className="text-right">
-                                    <h2 className="text-2xl font-black uppercase tracking-tighter">{currentMovie.title}</h2>
-                                    <p className="text-blue-400 text-xs font-bold">STREAMING ACTIVE</p>
+                                    <h2 className="text-2xl font-black uppercase italic tracking-tighter">{selectedMovie.title}</h2>
+                                    <p className="text-blue-400 text-xs font-bold uppercase tracking-widest mt-1">Direct Stream 4K</p>
                                 </div>
                             </div>
 
-                            <div className="max-w-4xl mx-auto w-full">
-                                <div className="flex justify-between text-xs font-bold mb-2 text-slate-400">
-                                    <span>{videoRef.current ? formatTime(videoRef.current.currentTime) : '0:00'}</span>
-                                    <span>{formatTime(duration)}</span>
+                            <div className="max-w-5xl mx-auto w-full">
+                                <div className="flex items-center gap-6 mb-8">
+                                    <button onClick={() => videoRef.current.currentTime -= 10} className="text-white/60 hover:text-white"><Icon name="back" size={32}/></button>
+                                    <button onClick={togglePlay} className="w-24 h-24 bg-white text-black rounded-full flex items-center justify-center hover:scale-110 transition-all shadow-2xl">
+                                        <Icon name={isPlaying ? "pause" : "play"} size={40} className={isPlaying ? "" : "ml-2"} />
+                                    </button>
+                                    <button onClick={() => videoRef.current.currentTime += 10} className="text-white/60 hover:text-white rotate-180"><Icon name="back" size={32}/></button>
                                 </div>
                                 
-                                <div className="relative h-1.5 bg-white/20 rounded-full mb-8 cursor-pointer group">
-                                    <div className="absolute inset-y-0 left-0 bg-blue-600 rounded-full" style={{ width: `${progress}%` }}></div>
+                                <div className="relative h-2 bg-white/10 rounded-full cursor-pointer group mb-4">
+                                    <div className="absolute inset-y-0 left-0 bg-blue-600 rounded-full shadow-[0_0_15px_rgba(59,130,246,0.5)]" style={{ width: `${videoProgress}%` }}></div>
                                     <input 
-                                        type="range" min="0" max="100" step="0.1" value={progress}
+                                        type="range" min="0" max="100" step="0.1" value={videoProgress}
                                         onChange={(e) => {
-                                            const newTime = (e.target.value / 100) * duration;
-                                            videoRef.current.currentTime = newTime;
-                                            setProgress(e.target.value);
+                                            videoRef.current.currentTime = (e.target.value / 100) * duration;
+                                            setVideoProgress(e.target.value);
                                         }}
                                         className="absolute inset-0 w-full opacity-0 cursor-pointer z-10"
                                     />
                                 </div>
-
-                                <div className="flex items-center justify-center gap-12">
-                                    <button onClick={() => videoRef.current.currentTime -= 10} className="hover:text-blue-400 transition-colors"><Icon name="back" className="w-8 h-8"/></button>
-                                    <button onClick={togglePlay} className="w-20 h-20 bg-white text-black rounded-full flex items-center justify-center hover:scale-110 transition-all">
-                                        <Icon name={isPlaying ? "pause" : "play"} className="w-10 h-10 ml-1" />
-                                    </button>
-                                    <button onClick={() => videoRef.current.currentTime += 10} className="hover:text-blue-400 transition-colors"><Icon name="back" className="w-8 h-8 rotate-180"/></button>
+                                <div className="flex justify-between text-[11px] font-black text-slate-500 uppercase tracking-widest">
+                                    <span>{videoRef.current ? Math.floor(videoRef.current.currentTime / 60) + ":" + ("0" + Math.floor(videoRef.current.currentTime % 60)).slice(-2) : "0:00"}</span>
+                                    <span>{Math.floor(duration / 60)}:{("0" + Math.floor(duration % 60)).slice(-2)}</span>
                                 </div>
                             </div>
                         </div>
@@ -260,49 +263,86 @@
                 <div className="flex">
                     <Sidebar />
                     
-                    <main className="flex-1 ml-20 md:ml-24 p-10 h-screen overflow-y-auto">
-                        {view === 'catalog' && (
-                            <>
-                                <header className="mb-12">
-                                    <h1 className="text-5xl font-black mb-4 tracking-tighter italic">LAMPA <span className="text-blue-500">PRO</span></h1>
-                                    <p className="text-slate-500 font-bold uppercase text-xs tracking-[0.3em]">Premium Streaming Interface</p>
-                                </header>
-                                
-                                <section>
-                                    <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
-                                        <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                                        {activeTab === 'home' ? 'Популярне зараз' : activeTab.toUpperCase()}
-                                    </h2>
-                                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-8">
-                                        {MOVIES.map(movie => (
-                                            <div key={movie.id} onClick={() => handlePlay(movie)} className="movie-card group bg-slate-900 rounded-3xl p-3 cursor-pointer border border-white/5 transition-all shadow-2xl">
-                                                <div className="relative overflow-hidden rounded-2xl aspect-[2/3] mb-4">
-                                                    <img src={movie.img} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
-                                                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                                        <div className="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center shadow-lg">
-                                                            <Icon name="play" className="text-white w-6 h-6 ml-1" />
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                <h3 className="font-bold text-center text-sm truncate px-2">{movie.title}</h3>
-                                                <p className="text-[10px] text-center text-slate-500 mt-1 uppercase font-black">Full HD • 2024</p>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </section>
-                            </>
-                        )}
+                    <main className="flex-1 ml-20 p-8 md:p-14 h-screen overflow-y-auto">
+                        <header className="mb-14 flex justify-between items-end">
+                            <div>
+                                <h1 className="text-6xl font-black italic tracking-tighter mb-2">LAMPA <span className="text-blue-600">PRO</span></h1>
+                                <p className="text-slate-500 font-bold uppercase text-[10px] tracking-[0.4em]">The Ultimate Streaming Engine</p>
+                            </div>
+                            <div className="hidden md:flex gap-4">
+                                <div className="text-right">
+                                    <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">Ваш статус</div>
+                                    <div className="text-green-500 font-black text-sm uppercase italic">Premium Active</div>
+                                </div>
+                            </div>
+                        </header>
 
-                        {view === 'settings' && (
-                            <div className="max-w-2xl">
-                                <h2 className="text-4xl font-black mb-10">НАЛАШТУВАННЯ</h2>
-                                <div className="space-y-6">
-                                    {['Інтерфейс', 'Плеєр', 'Джерела', 'Плагіни', 'Про систему'].map(item => (
-                                        <div key={item} className="p-6 bg-slate-900/50 rounded-2xl border border-white/5 hover:border-blue-500/30 cursor-pointer flex justify-between items-center group">
-                                            <span className="font-bold text-lg">{item}</span>
-                                            <Icon name="back" className="rotate-180 text-slate-600 group-hover:text-blue-500" />
+                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-10">
+                            {MOVIES_DATA.map(movie => (
+                                <div 
+                                    key={movie.id} 
+                                    onClick={() => setSelectedMovie(movie)}
+                                    className="movie-card group bg-slate-900/30 rounded-[32px] p-3 cursor-pointer border border-white/5 backdrop-blur-sm"
+                                >
+                                    <div className="relative aspect-[2/3] rounded-[24px] overflow-hidden mb-5">
+                                        <img src={movie.img} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
+                                        <div className="absolute top-4 left-4 rating-badge">
+                                            IMDb {movie.rating}
                                         </div>
-                                    ))}
+                                        <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-transparent opacity-60"></div>
+                                        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-blue-600/20 backdrop-blur-[2px]">
+                                            <div className="w-14 h-14 bg-white text-black rounded-full flex items-center justify-center shadow-2xl scale-75 group-hover:scale-100 transition-transform duration-500">
+                                                <Icon name="play" size={24} className="ml-1" />
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="px-2 pb-2">
+                                        <h3 className="font-bold text-lg leading-tight truncate mb-1">{movie.title}</h3>
+                                        <div className="flex justify-between items-center text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                                            <span>{movie.year}</span>
+                                            <span className="text-blue-500">{movie.genres[0]}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* Модальне вікно опису (Деталі) */}
+                        {selectedMovie && view !== 'player' && (
+                            <div className="fixed inset-0 z-[60] flex items-center justify-center p-6 bg-slate-950/80 backdrop-blur-xl animate-in fade-in duration-300">
+                                <div className="relative w-full max-w-5xl bg-slate-900 rounded-[40px] overflow-hidden flex flex-col md:flex-row shadow-2xl border border-white/5">
+                                    <button onClick={() => setSelectedMovie(null)} className="absolute top-6 right-6 z-10 p-3 bg-black/20 hover:bg-white/10 rounded-full text-white transition-all">
+                                        <Icon name="close" size={24} />
+                                    </button>
+                                    
+                                    <div className="w-full md:w-2/5 h-[400px] md:h-auto">
+                                        <img src={selectedMovie.img} className="w-full h-full object-cover" />
+                                    </div>
+                                    
+                                    <div className="p-10 md:p-14 flex-1 flex flex-col justify-center">
+                                        <div className="flex items-center gap-4 mb-6">
+                                            <span className="bg-blue-600 px-4 py-1 rounded-lg text-xs font-black italic">ULTRA HD</span>
+                                            <span className="text-yellow-500 font-black text-xl flex items-center gap-1"><Icon name="star" size={20} fill="currentColor" /> {selectedMovie.rating}</span>
+                                        </div>
+                                        <h2 className="text-5xl font-black mb-2 leading-none uppercase italic">{selectedMovie.title}</h2>
+                                        <p className="text-slate-500 font-bold mb-8 uppercase tracking-widest text-sm">{selectedMovie.orig} • {selectedMovie.year}</p>
+                                        
+                                        <p className="text-slate-300 text-lg leading-relaxed mb-10 max-w-xl">
+                                            {selectedMovie.desc}
+                                        </p>
+
+                                        <div className="flex gap-4">
+                                            <button 
+                                                onClick={() => startPlayback(selectedMovie)}
+                                                className="flex-1 md:flex-none px-12 py-5 bg-white text-black rounded-2xl font-black uppercase italic tracking-widest hover:bg-blue-500 hover:text-white transition-all flex items-center justify-center gap-3 shadow-xl"
+                                            >
+                                                <Icon name="play" size={20} /> ДИВИТИСЬ
+                                            </button>
+                                            <button className="p-5 bg-white/5 rounded-2xl hover:bg-white/10 transition-all border border-white/10 text-white">
+                                                <Icon name="series" />
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         )}
